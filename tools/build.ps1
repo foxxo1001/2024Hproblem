@@ -34,12 +34,12 @@ foreach ($sourcePath in $sourcePaths) {
 }
 Push-Location $generatedDir
 try {
-    $firmware = Join-Path $buildDir 'h2024_car.out'
+    $firmware = Join-Path $buildDir 'basic_car.out'
     & $cc @flags @objects "-Wl,-i$Sdk/source" "-Wl,-i$Compiler/lib" '-Wl,-ldevice_linker.cmd' `
         '-Wl,-ldevice.cmd.genlibs' '-Wl,-llibc.a' '-Wl,--rom_model' '-Wl,--stack_size=2048' `
-        "-Wl,-m$buildDir/h2024_car.map" -o $firmware
+        "-Wl,-m$buildDir/basic_car.map" -o $firmware
     if ($LASTEXITCODE -ne 0) { throw 'Link failed' }
-    & "$Compiler/bin/tiarmobjcopy.exe" -O binary $firmware "$buildDir/h2024_car.bin"
+    & "$Compiler/bin/tiarmobjcopy.exe" -O binary $firmware "$buildDir/basic_car.bin"
     if ($LASTEXITCODE -ne 0) { throw 'Binary export failed' }
     Write-Output "Built: $firmware"
 } finally { Pop-Location }

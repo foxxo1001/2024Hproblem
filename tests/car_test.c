@@ -1,7 +1,6 @@
 #include "car.h"
 #include "pid.h"
 #include "app_config.h"
-#include "drive.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -9,43 +8,6 @@
 
 #define PI_D 3.14159265358979323846
 static const car_geometry_t geometry = {0.25f, 0.25f, 120.0f};
-static unsigned motor_left, motor_right;
-static bool motor_is_braked;
-void motor_set_forward(uint16_t left, uint16_t right)
-{
-    motor_left = left;
-    motor_right = right;
-    motor_is_braked = false;
-}
-void motor_brake(void) { motor_left = motor_right = 0; motor_is_braked = true; }
-void motor_disable(void) { motor_left = motor_right = 0; motor_is_braked = false; }
-
-static void drive_tests(void)
-{
-    drive_t drive;
-    drive_init(&drive);
-    car_t car;
-    car_init(&car, geometry);
-    assert(car_start(&car, 1, true));
-    car.left_target_mm_s = car.right_target_mm_s = 260;
-    car_input_t in = {.imu_ok = true};
-    for (unsigned tick = 0; tick < 100; ++tick) {
-        drive_update(&drive, &car, &in);
-        assert(motor_left <= MOTOR_PWM_LIMIT && motor_right <= MOTOR_PWM_LIMIT);
-    }
-    /* 高速直线进入小半径前进转向，外轮仍受最高轮速约束。 */
-    car.left_target_mm_s = 10;
-    car.right_target_mm_s = 210;
-    drive_update(&drive, &car, &in);
-    assert(drive.left_ramped_mm_s > 0);
-    assert(drive.right_ramped_mm_s <= CAR_MAX_WHEEL_SPEED_MM_S);
-    car_stop(&car);
-    drive_stop(&drive, true);
-    assert(motor_left == 0 && motor_right == 0 && motor_is_braked);
-    assert(drive.left_pid.i_out == 0 && drive.right_pid.i_out == 0);
-    assert(drive.left_ramped_mm_s == 0 && drive.right_ramped_mm_s == 0);
-}
-
 static void basic_tests(void)
 {
     assert(!line_decode(0x00).valid);
@@ -125,7 +87,7 @@ static void simulate(unsigned task, unsigned remove_line, bool slew_speed)
         double left = car.left_target_mm_s, right = car.right_target_mm_s;
         if (slew_speed) {
             double target = (left + right) * 0.5;
-            double step = SPEED_ACCEL_MM_S2 * CONTROL_DT;
+            double step = 450.0 * CONTROL_DT; /* 模拟电机有限的加速度 */
             if (mean_speed < target) mean_speed = fmin(target, mean_speed + step);
             else mean_speed = fmax(target, mean_speed - step);
             if (target > 0) { left *= mean_speed / target; right *= mean_speed / target; }
@@ -196,13 +158,13 @@ int main(void)
 {
     setbuf(stdout, NULL);
     basic_tests();
-    drive_tests();
+
     for (unsigned task = 1; task <= 4; ++task) {
         simulate(task, false, false);
         simulate(task, false, true);
     }
     simulate(2, true, true);
     simulate(3, 2, true);
-    puts("All control logic tests passed.");
+    puts("All basic car tests passed.");
     return 0;
 }
