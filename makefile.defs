@@ -1,0 +1,3 @@
+# CCS regenerates Debug/makefile and includes this file before linking.
+# Leave stack room for snprintf plus the pre-empting control/encoder handlers.
+ORDERED_OBJS += -Wl,--stack_size=2048

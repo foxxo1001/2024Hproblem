@@ -1,0 +1,113 @@
+/**
+ * @cliArgs --device "MSPM0G350X" --part "Default" --package "LQFP-64(PM)" --product "mspm0_sdk@2.11.00.07"
+ * @v2CliArgs --device "MSPM0G3507" --package "LQFP-64(PM)" --product "mspm0_sdk@2.11.00.07"
+ * @versions {"tool":"1.26.2+4477"}
+ * H 题：TB6612 双电机、双编码器、8 路数字灰度、独立 MPU6050 I2C。
+ */
+const GPIO = scripting.addModule("/ti/driverlib/GPIO", {}, false);
+const led = GPIO.addInstance();
+const key = GPIO.addInstance();
+const motor = GPIO.addInstance();
+const line = GPIO.addInstance();
+const alarm = GPIO.addInstance();
+const I2C = scripting.addModule("/ti/driverlib/I2C", {}, false);
+const oled = I2C.addInstance();
+const imu = I2C.addInstance();
+const PWM = scripting.addModule("/ti/driverlib/PWM", {}, false);
+const pwm = PWM.addInstance();
+const TIMER = scripting.addModule("/ti/driverlib/TIMER", {}, false);
+const timer = TIMER.addInstance();
+const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
+const UART = scripting.addModule("/ti/driverlib/UART", {}, false);
+const uart = UART.addInstance();
+const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
+
+// 保留原工程 80 MHz 主频配置。
+system.clockTree["PLL_PDIV"].divideValue = 2;
+system.clockTree["UDIV"].divideValue = 2;
+system.clockTree["PLL_QDIV"].multiplyValue = 5;
+system.clockTree["HSCLKMUX"].inputSelect = "HSCLKMUX_SYSPLL2X";
+SYSCTL.forceDefaultClkConfig = true;
+SYSCTL.clockTreeEn = true;
+Board.peripheral.$suggestSolution = "DEBUGSS";
+Board.peripheral.swclkPin.$assign = "PA20";
+Board.peripheral.swdioPin.$assign = "PA19";
+
+led.$name = "LED";
+led.associatedPins.create(2);
+led.associatedPins[0].$name = "LED0";
+led.associatedPins[0].pin.$assign = "PA14";
+led.associatedPins[1].$name = "LED1";
+led.associatedPins[1].pin.$assign = "PA15";
+key.$name = "KEY";
+key.associatedPins.create(2);
+for (let i = 0; i < 2; i++) {
+    key.associatedPins[i].$name = "KEY" + (i + 1);
+    key.associatedPins[i].direction = "INPUT";
+    key.associatedPins[i].internalResistor = "PULL_DOWN";
+    key.associatedPins[i].pin.$assign = "PB" + (6 + i);
+}
+motor.$name = "DC_MOTOR";
+motor.associatedPins.create(9);
+const motorNames = ["AIN1", "AIN2", "STBY", "AA", "AB", "BIN1", "BIN2", "BA", "BB"];
+const motorPins = ["PA8", "PA9", "PB24", "PA17", "PA18", "PA10", "PA11", "PA22", "PA23"];
+for (let i = 0; i < 9; i++) {
+    const pin = motor.associatedPins[i];
+    pin.$name = motorNames[i];
+    pin.pin.$assign = motorPins[i];
+    if (i === 3 || i === 4 || i === 7 || i === 8) {
+        pin.direction = "INPUT";
+        pin.internalResistor = "PULL_DOWN";
+        if (i === 3 || i === 7) {
+            pin.interruptEn = true;
+            pin.polarity = "RISE";
+        }
+    }
+}
+// S0 到 S7：从车头向前看，从左至右。
+line.$name = "LINE";
+line.associatedPins.create(8);
+const linePins = ["PB0", "PB1", "PB4", "PB5", "PB8", "PB9", "PB10", "PB11"];
+for (let i = 0; i < 8; i++) {
+    line.associatedPins[i].$name = "S" + i;
+    line.associatedPins[i].direction = "INPUT";
+    line.associatedPins[i].internalResistor = "PULL_UP";
+    line.associatedPins[i].pin.$assign = linePins[i];
+}
+alarm.$name = "ALARM";
+alarm.associatedPins.create(1);
+alarm.associatedPins[0].$name = "BUZZER";
+alarm.associatedPins[0].pin.$assign = "PA24";
+// TIMG0 两路同周期 PWM。取消原来的舵机。
+pwm.$name = "PWMA";
+pwm.ccIndex = [0, 1];
+pwm.pwmMode = "EDGE_ALIGN_UP";
+pwm.timerCount = 4000;
+pwm.timerStartTimer = true;
+pwm.peripheral.$assign = "TIMG0";
+pwm.peripheral.ccp0Pin.$assign = "PA12";
+pwm.peripheral.ccp1Pin.$assign = "PA13";
+timer.$name = "PID_TIMER";
+timer.timerMode = "PERIODIC";
+timer.timerClkPrescale = 64;
+timer.timerPeriod = "10 ms";
+timer.interrupts = ["ZERO"];
+timer.timerStartTimer = false;
+timer.peripheral.$assign = "TIMG6";
+oled.$name = "OLED";
+oled.basicEnableController = true;
+oled.peripheral.$assign = "I2C1";
+oled.peripheral.sdaPin.$assign = "PB3";
+oled.peripheral.sclPin.$assign = "PB2";
+imu.$name = "IMU";
+imu.basicEnableController = true;
+imu.basicControllerStandardBusSpeed = "Fast";
+imu.peripheral.$assign = "I2C0";
+imu.peripheral.sdaPin.$assign = "PA0";
+imu.peripheral.sclPin.$assign = "PA1";
+uart.$name = "PRINT";
+uart.targetBaudRate = 115200;
+uart.enabledInterrupts = [];
+uart.peripheral.$assign = "UART0";
+uart.peripheral.rxPin.$assign = "PA31";
+uart.peripheral.txPin.$assign = "PA28";
