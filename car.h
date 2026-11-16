@@ -2,6 +2,7 @@
 #define CAR_H
 #include <stdbool.h>
 #include <stdint.h>
+#include "line_sensor.h"
 
 typedef enum {
     CAR_IDLE,       /* 待机 */
@@ -16,11 +17,6 @@ typedef enum {
     CAR_ERR_STALL, CAR_ERR_DIRECTION, CAR_ERR_TIMEOUT, CAR_ERR_DISTANCE
 } car_fault_t;
 
-typedef struct {
-    uint8_t mask;       /* bit0 在最左边，1=黑 */
-    bool valid;
-    float error;        /* 黑线偏左为正，偏右为负 */
-} line_sample_t;
 
 typedef struct {
     float left_mm_per_count, right_mm_per_count;
@@ -50,7 +46,6 @@ typedef struct {
     uint16_t lost_line_ms, stalled_ms[2], reversed_ms[2];
 } car_t;
 
-line_sample_t line_decode(uint8_t mask);
 void car_init(car_t *car, car_geometry_t geometry);
 bool car_geometry_valid(const car_t *car);
 bool car_running(const car_t *car);

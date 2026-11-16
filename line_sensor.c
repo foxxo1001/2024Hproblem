@@ -2,6 +2,27 @@
 #include "line_sensor.h"
 #include "app_config.h"
 
+line_sample_t line_decode(uint8_t mask)
+{
+    line_sample_t line = {0};
+    float sum = 0;
+    unsigned count = 0, groups = 0;
+    bool previous_black = false;
+    line.mask = mask;
+    for (unsigned i = 0; i < 8; ++i) {
+        bool black = (mask & (1U << i)) != 0;
+        if (black) {
+            ++count;
+            sum += 3.5f - i; /* 左边为正，右边为负，中间两路平均为 0。 */
+            if (!previous_black) ++groups;
+        }
+        previous_black = black;
+    }
+    line.valid = count >= 1 && count <= 5 && groups == 1;
+    if (line.valid) line.error = sum / count;
+    return line;
+}
+
 line_sample_t line_sensor_read(void)
 {
     static const uint32_t pins[8] = {

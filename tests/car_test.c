@@ -1,3 +1,4 @@
+#include "ti_msp_dl_config.h"
 #include "car.h"
 #include "pid.h"
 #include "app_config.h"
@@ -6,10 +7,19 @@
 #include <stdio.h>
 #include <string.h>
 
-#define PI_D 3.14159265358979323846
+uint32_t test_gpio_input;
 static const car_geometry_t geometry = {0.25f, 0.25f, 120.0f};
 static void basic_tests(void)
 {
+    /* 从实际 GPIO 电平到灰度位置的完整路径：白底、中央黑线、最左黑线。 */
+    uint32_t white = LINE_BLACK_LEVEL == 0 ? UINT32_MAX : 0;
+    test_gpio_input = white;
+    assert(line_sensor_read().mask == 0);
+    test_gpio_input = white ^ (LINE_S3_PIN | LINE_S4_PIN);
+    line_sample_t center = line_sensor_read();
+    assert(center.mask == 0x18 && center.valid && center.error == 0);
+    test_gpio_input = white ^ LINE_S0_PIN;
+    assert(line_sensor_read().mask == 0x01 && line_sensor_read().error > 0);
     assert(!line_decode(0x00).valid);
     assert(!line_decode(0xFF).valid);
     assert(!line_decode(0x81).valid);
